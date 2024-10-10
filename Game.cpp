@@ -82,14 +82,27 @@ Player *Game::spawn_player() {
 	Player &player = players.back();
 
 	//random point in the middle area of the arena:
-	player.position.x = glm::mix(ArenaMin.x + 2.0f * PlayerRadius, ArenaMax.x - 2.0f * PlayerRadius, 0.4f + 0.2f * mt() / float(mt.max()));
-	player.position.y = glm::mix(ArenaMin.y + 2.0f * PlayerRadius, ArenaMax.y - 2.0f * PlayerRadius, 0.4f + 0.2f * mt() / float(mt.max()));
+	player.position.x = glm::mix(ArenaMin.x + 2.0f * PlayerRadius, ArenaMax.x - 2.0f * PlayerRadius, 0.4f + 0.4f * mt() / float(mt.max()));
+	player.position.y = glm::mix(ArenaMin.y + 2.0f * PlayerRadius, ArenaMax.y - 2.0f * PlayerRadius, 0.4f + 0.4f * mt() / float(mt.max()));
 
+	if ((next_player_number - 1) % 5 == 0) {
+		player.it = true;
+	}
+	
 	do {
-		player.color.r = mt() / float(mt.max());
-		player.color.g = mt() / float(mt.max());
-		player.color.b = mt() / float(mt.max());
+		if (player.it) {
+			player.color.r = 1.0f;
+			player.color.g = 0.0f;
+			player.color.b = 0.0f;
+
+		} else {
+			player.color.r = 0.0f;
+			player.color.g = 0.0f;
+			player.color.b = 1.0f;
+		}
+
 	} while (player.color == glm::vec3(0.0f));
+
 	player.color = glm::normalize(player.color);
 
 	player.name = "Player " + std::to_string(next_player_number++);
@@ -113,10 +126,13 @@ void Game::update(float elapsed) {
 	//position/velocity update:
 	for (auto &p : players) {
 		glm::vec2 dir = glm::vec2(0.0f, 0.0f);
-		if (p.controls.left.pressed) dir.x -= 1.0f;
-		if (p.controls.right.pressed) dir.x += 1.0f;
-		if (p.controls.down.pressed) dir.y -= 1.0f;
-		if (p.controls.up.pressed) dir.y += 1.0f;
+
+		if (!p.tagged) {
+			if (p.controls.left.pressed) dir.x -= 1.0f;
+			if (p.controls.right.pressed) dir.x += 1.0f;
+			if (p.controls.down.pressed) dir.y -= 1.0f;
+			if (p.controls.up.pressed) dir.y += 1.0f;
+		}
 
 		if (dir == glm::vec2(0.0f)) {
 			//no inputs: just drift to a stop
@@ -163,6 +179,20 @@ void Game::update(float elapsed) {
 			//mirror velocity to be in separating direction:
 			glm::vec2 v12 = p2.velocity - p1.velocity;
 			glm::vec2 delta_v12 = dir * glm::max(0.0f, -1.75f * glm::dot(dir, v12));
+			if (p1.it && !p2.it) {
+				p2.tagged = true;
+				p1.velocity -= 0.5f * delta_v12;
+				p2.velocity = glm::vec2(0.0f, 0.0f);
+				continue;
+			} else if (p2.it && !p1.it) {
+				p1.tagged = true;
+				p2.velocity -= 0.5f * delta_v12;
+				p1.velocity = glm::vec2(0.0f, 0.0f);
+				continue;
+			} else if (!p1.it && !p2.it && (p1.tagged || p2.tagged)) {
+				p1.tagged = false;
+				p2.tagged = false;
+			}
 			p2.velocity += 0.5f * delta_v12;
 			p1.velocity -= 0.5f * delta_v12;
 		}
